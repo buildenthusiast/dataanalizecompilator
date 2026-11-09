@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .budget_common import (RED_HEX, GREEN_HEX, clean_number, is_formula, iter_files, mark,
-                            open_for_edit, ready_folder, safe_copy)
+from .budget_common import (RED_HEX, GREEN_HEX, clean_number, copy_sheet, is_formula, iter_files, mark,
+                            open_for_edit, ready_folder, safe_copy, sheet_ref)
 from .readers import Grid, load_grid, to_number
 
 TYPES = [
@@ -383,13 +383,41 @@ def consolidate_sheets(sources: list[tuple[str, Path]] | list[Path], dst: Path) 
 
 
 def consolidate_sum(base: Path, sources: list[Path], dst: Path, coords_fn, name_text: str | None,
-                    name_fn=None) -> tuple[Path, Grid]:
+                    name_fn=None, names: list[str] | None = None) -> tuple[Path, Grid]:
+    """Обобщава чрез сумиране. Ако са дадени имена, листовете на всяко заведение се добавят
+    в същия файл, а обобщените клетки стават формули, които сочат към тях."""
     grids = [load_grid(s) for s in sources]
     base_grid = load_grid(base)
     coords = coords_fn(grids, base_grid)
     sums = _sum_cells(grids, base_grid, coords)
     wb, ext = open_for_edit(base)
     _write_sums(wb, sums, base_grid)
+    if names:
+        base_names = list(base_grid)
+        # листове на заведенията: titles[i][j] = име на копието на j-тия лист на i-тото заведение
+        titles: list[list[str | None]] = []
+        for name, src in zip(names, sources):
+            swb, _ = open_for_edit(src)
+            row_titles = []
+            for j, sws in enumerate(swb.worksheets[:len(base_names)]):
+                short = re.sub(r"(?i)приходи\s*\+\s*разходи", "ОПР", sws.title)
+                t = name if len(base_names) == 1 else f"{name[:20]} - {short[:8]}"
+                new_ws = copy_sheet(sws, wb, t)
+                new_ws.sheet_properties.tabColor = "92D050"
+                row_titles.append(new_ws.title)
+            row_titles += [None] * (len(base_names) - len(row_titles))
+            titles.append(row_titles)
+        for sname, cells in sums.items():
+            j = base_names.index(sname)
+            ws = wb.worksheets[j]
+            for (r, c) in cells:
+                cell = ws.cell(r + 1, c + 1)
+                if type(cell).__name__ == "MergedCell" or is_formula(cell.value):
+                    continue
+                refs = [sheet_ref(t[j], r + 1, c + 1) for t in titles if t[j]]
+                if refs:
+                    cell.value = "=" + "+".join(refs)
+        wb.calculation.fullCalcOnLoad = True
     if name_text and name_fn:
         name_fn(wb, base_grid, name_text)
     # обобщена решетка за проверките (вкл. стойностите на формулите)
@@ -489,6 +517,7 @@ def run(root: Path, groups: dict[str, str], rzi_name: str = "РЗИ ПАЗАРД
         out10 = None
         for t, *_ in TYPES:
             srcs = [h.files[t] for h in members if t in h.files]
+            names = [h.name for h in members if t in h.files]
             if not srcs:
                 continue
             base = next((s for s in srcs if s.suffix.lower() in (".xlsx", ".xlsm")), srcs[0])
@@ -503,13 +532,13 @@ def run(root: Path, groups: dict[str, str], rzi_name: str = "РЗИ ПАЗАРД
                         wb.worksheets[0]["A4"] = text
                         if len(wb.worksheets) > 1:
                             wb.worksheets[1]["A4"] = text
-                    out10, g10_sum = consolidate_sum(base, srcs, dst, coords10, label, name10)
+                    out10, g10_sum = consolidate_sum(base, srcs, dst, coords10, label, name10, names)
                 elif t == "12B":
                     def coords12(grids, bg):
                         p = parse_12b(bg)
                         rows = [p[k] for k in ("Задължения", "Вземания") if k in p]
                         return {p["sheet"]: [(r, c) for r in rows for c in p["years"].values()]}
-                    out12, g12_sum = consolidate_sum(base, srcs, dst, coords12, None)
+                    out12, g12_sum = consolidate_sum(base, srcs, dst, coords12, None, None, names)
                 elif t == "4A":
                     consolidate_list(base, srcs, dst)
                 elif t == "6A":
@@ -517,7 +546,7 @@ def run(root: Path, groups: dict[str, str], rzi_name: str = "РЗИ ПАЗАРД
                 else:
                     def name6(wb, bg, text):
                         _set_name(wb.worksheets[0], text, list(bg.values())[0])
-                    consolidate_sum(base, srcs, dst, _generic_numeric_cells, label, name6)
+                    consolidate_sum(base, srcs, dst, _generic_numeric_cells, label, name6, names)
                 log(f"  ✓ {TYPE_LABEL[t]} {grp}: обобщени {len(srcs)} файла")
             except Exception as e:  # noqa: BLE001
                 log(f"  ✗ {TYPE_LABEL[t]} {grp}: грешка: {e}")

@@ -218,9 +218,9 @@ class BudgetLzbpPage(TaskPage):
 
 class MunicipalPage(TaskPage):
     title = "Бюджетни прогнози общини"
-    subtitle = ("Обобщава Приложение 7в от всички общини в един файл. Средната заплата се изчислява наново "
-                "(средства / численост / 12), а във файла на всяка община се оцветява в червено, "
-                "ако посочената средна заплата не отговаря на изчислената.")
+    subtitle = ("Обобщава Приложение 7в от всички общини в един файл: първият лист е общият (с формули), "
+                "а след него е лист за всяка община. В листа на общината се оцветява в червено, "
+                "ако посочената средна заплата не отговаря на средства / численост / 12.")
 
     def __init__(self, settings, parent=None):
         super().__init__(settings, parent)
@@ -230,6 +230,15 @@ class MunicipalPage(TaskPage):
         self.folder = FolderPicker()
         self.folder.set_path(self.s.get_json("mun_folder", ""))
         b.addWidget(self.folder)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Средна заплата в обобщения лист:"))
+        self.avg_mode = QComboBox()
+        for key, text in municipal.AVG_MODES.items():
+            self.avg_mode.addItem(text, key)
+        self.avg_mode.setCurrentIndex(max(0, self.avg_mode.findData(self.s.get("mun_avg_mode"))))
+        self.avg_mode.currentIndexChanged.connect(lambda: self.s.set("mun_avg_mode", self.avg_mode.currentData()))
+        row.addWidget(self.avg_mode, 1)
+        b.addLayout(row)
         self.root.addWidget(box)
         self.panel = RunPanel("Обобщи")
         self.panel.button.clicked.connect(self.run)
@@ -241,7 +250,7 @@ class MunicipalPage(TaskPage):
             QMessageBox.warning(self, "Липсва папка", "Изберете папката с файловете на общините.")
             return
         self.s.set_json("mun_folder", path)
-        self.start(municipal.run, Path(path), self.s.get("avg_tolerance_pct"))
+        self.start(municipal.run, Path(path), self.s.get("avg_tolerance_pct"), self.s.get("mun_avg_mode"))
 
     def result_folder(self, res):
         out, _ = res

@@ -102,3 +102,61 @@ def strip_name(stem: str, patterns: list[str]) -> str:
     for p in patterns:
         s = re.sub(p, " ", s, flags=re.I)
     return " ".join(s.replace("_", " ").split()).strip(" -")
+
+
+def copy_sheet(src_ws, dst_wb, title: str):
+    """Копира лист (стойности, формати, ширини, обединени клетки) в друга работна книга."""
+    from copy import copy
+    ws = dst_wb.create_sheet(safe_title(title, dst_wb))
+    for row in src_ws.iter_rows():
+        for c in row:
+            if type(c).__name__ == "MergedCell":
+                continue
+            n = ws.cell(c.row, c.column, c.value)
+            if c.has_style:
+                n.font = copy(c.font)
+                n.fill = copy(c.fill)
+                n.border = copy(c.border)
+                n.alignment = copy(c.alignment)
+                n.number_format = c.number_format
+                n.protection = copy(c.protection)
+            if c.comment:
+                n.comment = copy(c.comment)
+    for k, d in src_ws.column_dimensions.items():
+        ws.column_dimensions[k].width = d.width
+        ws.column_dimensions[k].hidden = d.hidden
+    for k, d in src_ws.row_dimensions.items():
+        ws.row_dimensions[k].height = d.height
+    for m in src_ws.merged_cells.ranges:
+        ws.merge_cells(str(m))
+    ws.sheet_view.zoomScale = src_ws.sheet_view.zoomScale
+    ws.freeze_panes = src_ws.freeze_panes
+    return ws
+
+
+def safe_title(name: str, wb=None) -> str:
+    t = re.sub(r"[\[\]\*\?/\\:]", " ", name).strip()[:31] or "Лист"
+    if wb is not None:
+        base, k = t, 2
+        while t in wb.sheetnames:
+            t = f"{base[:27]} ({k})"
+            k += 1
+    return t
+
+
+def sheet_ref(title: str, row: int, col: int) -> str:
+    """Препратка към клетка в друг лист, напр. 'ОБЩИНА БАТАК'!D9 (1-базирани индекси)."""
+    from openpyxl.utils import get_column_letter
+    return f"'{title.replace(chr(39), chr(39) * 2)}'!{get_column_letter(col)}{row}"
+
+
+def number_format_for(unit: str | None, decimals_money: int = 2) -> str:
+    """Числов формат като във файловете на РЗИ; нулите не се показват."""
+    u = (unit or "").strip().lower()
+    if u == "евро" or "лв" in u or "евро" in u:
+        base = "#,##0." + "0" * decimals_money
+    elif "щатни" in u:
+        base = "#,##0.00"
+    else:
+        base = "#,##0"
+    return f"{base};-{base};;@"

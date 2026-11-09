@@ -23,6 +23,7 @@ DEFAULTS = {
     "thr_high": 10.0,
     "rzi_name": "РЗИ ПАЗАРДЖИК",
     "avg_tolerance_pct": 1.0,
+    "mun_avg_mode": "formula",     # formula / sum
     "last_page": 0,
 }
 
