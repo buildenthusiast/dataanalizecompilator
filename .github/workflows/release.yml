@@ -1,0 +1,47 @@
+name: Build Windows exe
+
+# Нова версия: смени VERSION в app/__init__.py, после създай етикет, напр.:
+#   git tag v0.2.0 && git push origin v0.2.0
+# GitHub ще направи .exe и ще го публикува като издание (release),
+# а програмата сама ще предложи обновлението.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pillow
+      - name: Make icon
+        run: python tools/make_icon.py
+      - name: Build exe
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name DataAnalizeCompilator
+          --icon build_icon.ico
+          main.py
+      - name: Smoke test (imports)
+        run: python -c "import app.core.annual_compare, app.core.budget_lzbp, app.core.municipal"
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/DataAnalizeCompilator.exe
+          generate_release_notes: true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataAnalizeCompilator
+          path: dist/DataAnalizeCompilator.exe
