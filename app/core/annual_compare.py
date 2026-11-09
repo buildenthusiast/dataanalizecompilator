@@ -41,6 +41,8 @@ REPORT_TYPES: list[tuple[str, str, re.Pattern]] = [
 TYPE_LABEL = {k: lbl for k, lbl, _ in REPORT_TYPES}
 
 KEYED_TYPES = {"HOSP_DAY", "HOSP_STAT"}
+# Видове отчети, които не се сравняват (по желание на потребителя)
+IGNORED_TYPES = {"HOSP_DAY", "HOSP_STAT"}
 
 
 def detect_type(path: Path) -> str | None:
@@ -98,7 +100,7 @@ def scan_folder(root: Path, log: Callable[[str], None] | None = None) -> tuple[l
             if p.suffix.lower() not in SUPPORTED_EXT:
                 continue
             rtype = detect_type(p)
-            if rtype is None:
+            if rtype is None or rtype in IGNORED_TYPES:
                 skipped.append(p)
                 continue
             rel = p.relative_to(root)
@@ -468,7 +470,7 @@ def run_comparison(new_root: Path, old_roots: list[Path], t: Thresholds,
     for p in old_roots:
         log(f"Сканиране на {p} ...")
         old_sets.append(scan_folder(p)[0])
-    log(f"Намерени отчети: {len(new_files)} (пропуснати непознати файлове: {len(skipped)})")
+    log(f"Намерени отчети: {len(new_files)} (пропуснати файлове: {len(skipped)} - хоспитализации и непознати)")
 
     results: list[FileResult] = []
     total = len(new_files)
@@ -527,7 +529,7 @@ def run_comparison(new_root: Path, old_roots: list[Path], t: Thresholds,
                 ws.cell(row, col).fill = PatternFill("solid", start_color=FILL_HEX[color], end_color=FILL_HEX[color])
     if skipped:
         ws2 = wb.create_sheet("Пропуснати файлове")
-        ws2.append(["Файл (непознат вид отчет)"])
+        ws2.append(["Файл (не се сравнява: непознат вид или хоспитализации)"])
         for p in skipped:
             ws2.append([str(p.relative_to(new_root))])
     for col, w in zip("ABCDEFGHIJ", [40, 26, 60, 60, 10, 10, 10, 40]):
