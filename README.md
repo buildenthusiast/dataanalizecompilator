@@ -18,9 +18,8 @@
 автоматично обновяване от GitHub.
 
 ## Нова версия
-1. Смени `VERSION` в `app/__init__.py`.
-2. `git tag v0.2.0 && git push origin v0.2.0`
-3. GitHub Actions прави `DataAnalizeCompilator.exe` и го публикува. Програмата сама предлага обновлението.
+1. Смени `VERSION` в `app/__init__.py` и качи промяната в `main`.
+2. GitHub Actions прави `DataAnalizeCompilator.exe` и го публикува. Програмата сама предлага обновлението.
 
 ## Стартиране от изходния код
 ```
