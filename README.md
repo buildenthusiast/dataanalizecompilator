@@ -21,6 +21,10 @@
 1. Смени `VERSION` в `app/__init__.py` и качи промяната в `main`.
 2. GitHub Actions прави `DataAnalizeCompilator.exe` и го публикува. Програмата сама предлага обновлението.
 
+## Ако Windows блокира .exe (Smart App Control)
+Инсталирайте Python 3.12 от Microsoft Store и пуснете `install.ps1`. Програмата се слага в
+`%LOCALAPPDATA%\DataAnalizeCompilator`, с икона на работния плот, и се обновява сама.
+
 ## Стартиране от изходния код
 ```
 pip install -r requirements.txt

@@ -79,13 +79,13 @@ class Download(QThread):
     progress = Signal(int, int)
     done = Signal(str, str)
 
-    def __init__(self, url):
+    def __init__(self, url, suffix=".exe"):
         super().__init__()
-        self.url = url
+        self.url, self.suffix = url, suffix
 
     def run(self):
         try:
-            self.done.emit(updater.download(self.url, self.progress.emit), "")
+            self.done.emit(updater.download(self.url, self.progress.emit, self.suffix), "")
         except Exception as e:  # noqa: BLE001
             self.done.emit("", str(e))
 
@@ -239,10 +239,15 @@ class MainWindow(QMainWindow):
                                 f"Налична е нова версия {info.version} (сега: {VERSION}).\n\n{notes}\n\n"
                                 "Да се изтегли и инсталира ли сега?") != QMessageBox.Yes:
             return
+        self._source_mode = not updater.is_frozen()
+        url = info.zip_url if self._source_mode else info.url
+        if not url:
+            QMessageBox.warning(self, "Обновяване", "В изданието липсва файл за изтегляне.")
+            return
         self._dlg = QProgressDialog("Изтегляне на новата версия...", "Отказ", 0, 100, self)
         self._dlg.setWindowModality(Qt.WindowModal)
         self._dlg.show()
-        self._dl = Download(info.url)
+        self._dl = Download(url, ".zip" if self._source_mode else ".exe")
         self._dl.progress.connect(lambda d, t: self._dlg.setValue(int(d * 100 / max(t, 1))))
         self._dl.done.connect(self._downloaded)
         self._dl.start()
@@ -252,7 +257,12 @@ class MainWindow(QMainWindow):
         if err:
             QMessageBox.warning(self, "Обновяване", f"Грешка при изтегляне:\n{err}")
             return
-        if updater.install_and_restart(path):
+        try:
+            ok = updater.install_source_update(path) if self._source_mode else updater.install_and_restart(path)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.warning(self, "Обновяване", f"Грешка при инсталиране:\n{e}")
+            return
+        if ok:
             self._really_quit = True
             self.close()
         else:
