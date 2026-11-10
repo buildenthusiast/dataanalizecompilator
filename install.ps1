@@ -2,13 +2,13 @@
 # Изисква Python 3.10+ (от Microsoft Store или python.org).
 $ErrorActionPreference = 'Stop'
 $repo = 'buildenthusiast/dataanalizecompilator'
-$dest = Join-Path $env:LOCALAPPDATA 'DataAnalizeCompilator'
+# Не в AppData: Python от Microsoft Store пренасочва записите там
+$dest = Join-Path $env:USERPROFILE 'DataAnalizeCompilator'
 
 $py = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $py) { $py = (Get-Command py -ErrorAction SilentlyContinue).Source }
 if (-not $py) { throw 'Python не е инсталиран. Инсталирайте Python 3.12 от Microsoft Store и пуснете отново.' }
 & $py -c "import sys; assert sys.version_info >= (3,10), sys.version"
-$pyw = & $py -c "import sys,os; p=os.path.join(os.path.dirname(sys.executable),'pythonw.exe'); print(p if os.path.exists(p) else sys.executable)"
 
 Write-Host 'Изтегляне на последната версия...'
 $rel = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'DataAnalizeCompilator' }
@@ -21,8 +21,20 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item -Path (Join-Path $inner.FullName '*') -Destination $dest -Recurse -Force
 Remove-Item $tmp -Recurse -Force; Remove-Item $zip -Force
 
-Write-Host 'Инсталиране на библиотеките...'
-& $py -m pip install --user -q --disable-pip-version-check -r (Join-Path $dest 'requirements.txt')
+Write-Host 'Инсталиране на библиотеките (2-3 минути)...'
+# Отделна среда (venv) в кратък път - избягва грешката с дългите пътища в папката на Python от Store
+$venv = Join-Path $dest 'venv'
+if (-not (Test-Path (Join-Path $venv 'Scripts\python.exe'))) {
+    & $py -m venv $venv
+    if ($LASTEXITCODE -ne 0) { throw 'Неуспешно създаване на среда за Python (venv).' }
+}
+$vpy = Join-Path $venv 'Scripts\python.exe'
+$pyw = Join-Path $venv 'Scripts\pythonw.exe'
+& $vpy -m pip install -q --disable-pip-version-check --upgrade pip
+& $vpy -m pip install -q --disable-pip-version-check -r (Join-Path $dest 'requirements.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Библиотеките не се инсталираха (виж грешката по-горе). Програмата НЕ е готова.' }
+& $vpy -c "import PySide6.QtWidgets, openpyxl, xlrd"
+if ($LASTEXITCODE -ne 0) { throw 'Библиотеките са инсталирани, но не се зареждат (възможно е Smart App Control да ги блокира).' }
 
 $launcher = Join-Path $dest 'DataAnalizeCompilator.pyw'
 if (-not (Test-Path $launcher)) {

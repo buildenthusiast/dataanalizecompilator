@@ -84,7 +84,11 @@ def install_source_update(zip_path: str) -> bool:
     flags = 0x08000000 if sys.platform == "win32" else 0
     req = os.path.join(root, "requirements.txt")
     if os.path.exists(req):
-        subprocess.run([py, "-m", "pip", "install", "--user", "-q", "-r", req], creationflags=flags, check=False)
+        in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+        cmd = [py, "-m", "pip", "install", "-q", "-r", req]
+        if not in_venv:
+            cmd.insert(4, "--user")
+        subprocess.run(cmd, creationflags=flags, check=False)
     launcher = os.path.join(root, "DataAnalizeCompilator.pyw")
     if not os.path.exists(launcher):
         launcher = os.path.join(root, "main.py")

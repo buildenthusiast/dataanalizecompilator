@@ -23,7 +23,7 @@
 
 ## Ако Windows блокира .exe (Smart App Control)
 Инсталирайте Python 3.12 от Microsoft Store и пуснете `install.ps1`. Програмата се слага в
-`%LOCALAPPDATA%\DataAnalizeCompilator`, с икона на работния плот, и се обновява сама.
+`%USERPROFILE%\DataAnalizeCompilator`, с икона на работния плот, и се обновява сама.
 
 ## Стартиране от изходния код
 ```
