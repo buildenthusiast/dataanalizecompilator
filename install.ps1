@@ -25,6 +25,13 @@ Write-Host 'Инсталиране на библиотеките...'
 & $py -m pip install --user -q --disable-pip-version-check -r (Join-Path $dest 'requirements.txt')
 
 $launcher = Join-Path $dest 'DataAnalizeCompilator.pyw'
+if (-not (Test-Path $launcher)) {
+    Set-Content -Path $launcher -Encoding UTF8 -Value @(
+        'import os, sys',
+        'sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))',
+        'from main import main',
+        'sys.exit(main())')
+}
 $ws = New-Object -ComObject WScript.Shell
 foreach ($dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) {
     $lnk = $ws.CreateShortcut((Join-Path $dir 'Data Analize Compilator.lnk'))
